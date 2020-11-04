@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <!-- Require meta tag -->
+        <meta charset="utf-8">
+
+        <!-- ------------------------------bootstrap import------------------------------------------------------------ -->
+        <!-- Css -->
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+        
+        <!--  JS  -->
+        <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+        <!-- ---------------------------------------------------------------------------------------------------------- -->
+        <title>To Do List</title>
+
+    </head>
+    <body>
+        <nav class="navbar navbar-dark bg-dark">
+            <a class="navbar-brand tt">To Do List</a>
+            <div class="containerBtn">
+                <a id="add" class="btnEff effect04" data-sm-link-text="CLICK" target="_blank"><span class="colorT">ADD</span></a>
+            </div>
+            
+            
+              
+        </nav>
+        
+        
+        <div class="container">
+            <div>
+                <small id="nodata">No ToDolist </br></small>
+            </div>  
+            <div class="row">
+                <div class="col">
+                    <small id="todo1">To Do</small>
+                    <ul id="list" class="list-group"></ul>
+                </div>
+                <div class="col">
+                    <small id="todo2">Finished</small>
+                    <ul id="list2" class="list-group"></ul>
+                </div>
+            </div>
+            
+            
+        </div>
+        
+    </body>
+
+</html>
+
+<script>
+    const fs = require('fs');
+    const path = require('path');
+    const {ipcRenderer} = require('electron'); 
+    const ul = document.querySelector('#list');
+    const ul2 = document.querySelector('#list2');
+    const rootPath = require('electron-root-path').rootPath;
+    
+    var datacount=0;//unfinished count
+    var datacountF =0;//finished count
+    var data = {};
+    var empty ={};
+    var Nulldata ={};
+    Nulldata.table = [];
+    empty.table=[];
+    data.table = [];
+    var list=[];
+    var list2=[]; // use as a data to store finished.
+
+    function writeDeleteSingleData(){ //Delete for list.json
+        fs.writeFile("list.json", JSON.stringify(list), function(err) {
+            if (err) throw err;
+            console.log('complete');
+        });
+    }
+
+    function writeDeleteSingleData2(){ //Delete for finish.json
+        fs.writeFile("finished.json", JSON.stringify(list2), function(err) {
+            if (err) throw err;
+            console.log('complete');
+        });
+    }
+
+    function MoveToFinishedList(input){
+        const li2 = document.createElement('li');
+        const btn_li2 = document.createElement('button');
+        const title_h52 = document.createElement('h5');
+        const dueDate_p2 = document.createElement('p');
+        const title2 = document.createTextNode(input['title']);
+        const des2 = document.createTextNode(input['des']);
+        const dueDate2 = document.createTextNode("Due date: "+input['date']);
+        btn_li2.innerHTML = "remove";
+        btn_li2.setAttribute('id',"f"+datacountF);
+        btn_li2.setAttribute('class','btn btn-warning right');
+        btn_li2.onclick = function(e){
+            var index = this.id.slice(1);
+            setTimeout(loadData(),2000);
+            document.getElementById(this.id).parentNode.remove();
+            if(list2['table'].length==1){
+                ul2.innerHTML = null ;
+                fs.writeFile("finished.json", JSON.stringify(Nulldata), function(err) {
+                    if (err) throw err;
+                    console.log('complete');
+                });
+            }
+            else{
+                if(index != list2['table'].length-1){
+                    for(j=0;j<list2['table'].length;j++){
+                        if(j>=index){
+                            list2['table'][j] = list2['table'][j+1];
+                            if(j!=index)
+                                document.getElementById("f"+j).setAttribute('id',"f"+(j-1));
+                        }
+                    }
+                }
+                else
+                    console.error;
+                    
+                list2['table'].length -=1;
+                writeDeleteSingleData2(); 
+            }
+            
+            datacountF--;
+            showNolist();
+        }
+        writeData(input);
+        li2.setAttribute('class','list-group-item');
+        li2.setAttribute('id','lif'+datacountF);
+        dueDate_p2.appendChild(dueDate2);
+        title_h52.appendChild(title2);
+        li2.appendChild(title_h52);
+        li2.appendChild(des2);
+        li2.appendChild(btn_li2);
+        li2.appendChild(dueDate_p2);
+        ul2.appendChild(li2);
+        showNolist();
+        datacountF++;
+
+
+    }
+    
+    function showNolist() {
+        var x = document.getElementById("nodata");
+        var showList1 = document.getElementById("todo1");
+        var showList2 = document.getElementById("todo2");
+        if(!ul.getElementsByTagName("li").length>0 && !ul2.getElementsByTagName("li").length>0){
+            x.style.display = "block";
+            showList1.style.display = "none";
+            showList2.style.display = "none";
+        }
+        else{
+            x.style.display = "none";   
+            showList1.style.display = "block";
+            showList2.style.display = "block";
+        } 
+    }
+
+    function writeData(newData){
+        data.table = [];
+        for(i=0;i<list2['table'].length;i++){
+            var obj = {
+                title:list2['table'][i]['title'],
+                des:list2['table'][i]['des'],
+                date:list2['table'][i]['date']
+            }
+            data.table.push(obj);
+        }
+        data.table.push(newData);
+        console.log("WOW",data.table);
+        
+        fs.writeFile("finished.json", JSON.stringify(data), function(err) {
+            if (err) throw err;
+            console.log('add finished data complete.');
+        });
+    }
+
+    //Load data from json file
+    function loadData(){
+        try{
+            let rawdata = fs.readFileSync(path.resolve(rootPath,'list.json'));
+            list = JSON.parse(rawdata);
+        }catch(e){
+            console.log("missing list.json file");
+        }
+        try{
+            let rawdata2 = fs.readFileSync(path.resolve(rootPath,'finished.json'));
+            list2 = JSON.parse(rawdata2);
+        }catch(e){
+            console.log('missing finished.json file');
+            
+        }
+        console.log("unfinished",list['table']);
+        console.log("finished",list2['table']);
+    }
+    
+    //Prepare data to show in ul tag
+    function prepareData(){
+        for(i=0;i<list['table'].length;i++){
+            const li = document.createElement('li');
+            const btn_li = document.createElement('button');
+            const title_h5 = document.createElement('h5');
+            const dueDate_p = document.createElement('p');
+            const title = document.createTextNode(list['table'][i]['title']);
+            const des = document.createTextNode(list['table'][i]['des']);
+            const dueDate = document.createTextNode("Due date: "+list['table'][i]['date']);
+            btn_li.innerHTML = "finish!";
+            btn_li.setAttribute('id',i);
+            btn_li.setAttribute('class','btn btn-success right');
+            btn_li.onclick = function(e){
+                var thisBtn = document.getElementById(this.id);
+                var id = this.id;
+                console.log(id);
+                setTimeout(loadData(),1500);
+                var passData = {
+                    title:list['table'][id]['title'],
+                    des:list['table'][id]['des'],
+                    date:list['table'][id]['date']
+                }
+                if(list['table'].length==1){
+                    ul.innerHTML = null ;
+                    fs.writeFile("list.json", JSON.stringify(Nulldata), function(err) {
+                        if (err) throw err;
+                        console.log('complete');
+                    });
+                }
+                else{
+                    if(this.id != list['table'].length-1){
+                        for(j=0;j<list['table'].length;j++){
+                            if(j>=this.id){
+                                list['table'][j] = list['table'][j+1];
+                                if(j!=this.id)
+                                    document.getElementById(j).setAttribute('id',j-1);
+                            }
+                        }
+                    }
+                    list['table'].length -=1;
+                    writeDeleteSingleData(); 
+                }
+                
+                
+                console.log("passdata",passData);
+                //Create finish bar //////////////////////////////////////////////////////////////////////////////////////
+                console.log(this.id);
+                thisBtn.parentNode.remove();
+                datacount--;
+                MoveToFinishedList(passData);
+                showNolist();
+            }
+            li.setAttribute('class','list-group-item');
+            li.setAttribute('id','li'+i);
+            dueDate_p.appendChild(dueDate);
+            title_h5.appendChild(title);
+            li.appendChild(title_h5);
+            li.appendChild(des);
+            li.appendChild(btn_li);
+            li.appendChild(dueDate_p);
+            ul.appendChild(li);
+            showNolist();
+            datacount++;  
+        }
+        for(i=0;i<list2['table'].length;i++){
+            const li2 = document.createElement('li');
+            const btn_li2 = document.createElement('button');
+            const title_h52 = document.createElement('h5');
+            const dueDate_p2 = document.createElement('p');
+            const title2 = document.createTextNode(list2['table'][i]['title']);
+            const des2 = document.createTextNode(list2['table'][i]['des']);
+            const dueDate2 = document.createTextNode("Due date: "+list2['table'][i]['date']);
+            btn_li2.innerHTML = "remove";
+            btn_li2.setAttribute('id',"f"+i);
+            btn_li2.setAttribute('class','btn btn-warning right');
+            btn_li2.onclick = function(e){
+                var index = this.id.slice(1);
+                setTimeout(loadData(),3000);
+                console.log("check",list2);
+                document.getElementById(this.id).parentNode.remove();
+
+                if(list2['table'].length==1){
+                    ul2.innerHTML = null ;
+                    fs.writeFile("finished.json", JSON.stringify(Nulldata), function(err) {
+                        if (err) throw err;
+                        console.log('complete');
+                    });
+                }
+                else{
+                    if(index != list2['table'].length-1){
+                        for(j=0;j<list2['table'].length-1;j++){
+                            if(j>=index){
+                                list2['table'][j] = list2['table'][j+1];
+                                if(j!=index)
+                                    document.getElementById("f"+j).setAttribute('id',"f"+(j-1));
+                            }
+                        }
+                    }
+                    else
+                    console.log("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+                    console.log("check2",list2);
+                    
+                    list2['table'].length -=1;
+                    writeDeleteSingleData2(); 
+                }
+                
+                datacountF--;
+                showNolist();
+            }
+            li2.setAttribute('class','list-group-item');
+            li2.setAttribute('id','lif'+i);
+            dueDate_p2.appendChild(dueDate2);
+            title_h52.appendChild(title2);
+            li2.appendChild(title_h52);
+            li2.appendChild(des2);
+            li2.appendChild(btn_li2);
+            li2.appendChild(dueDate_p2);
+            ul2.appendChild(li2);
+            showNolist();
+            datacountF++;
+        }
+    }
+
+    setTimeout(loadData(),1500);
+    prepareData();
+    console.log("check1",list['table']);
+    console.log("check2",list2['table']);
+    showNolist();
+
+    
+    ipcRenderer.on('item:add',function(e,input){
+        const li = document.createElement('li');
+        const btn_li = document.createElement('button');
+        const title_h5 = document.createElement('h5');
+        const dueDate_p = document.createElement('p');
+        const title = document.createTextNode(input['title']);
+        const des = document.createTextNode(input['des']);
+        const dueDate = document.createTextNode("Due date: "+input['date']);
+        btn_li.innerHTML = "finish!";
+        btn_li.setAttribute('id',datacount);
+        btn_li.setAttribute('class','btn btn-success right');
+        btn_li.onclick = function(e){
+            var thisBtn = document.getElementById(this.id);
+            var id = this.id;
+            console.log(id);
+            setTimeout(loadData(),1500);
+            var passData = {
+                title:list['table'][id]['title'],
+                des:list['table'][id]['des'],
+                date:list['table'][id]['date']
+            }
+
+            if(list['table'].length==1){
+                ul.innerHTML = null ;
+                fs.writeFile("list.json", JSON.stringify(Nulldata), function(err) {
+                    if (err) throw err;
+                    console.log('complete');
+                });
+            }
+            else{
+                for(j=0;j<list['table'].length;j++){
+                    if(j>=this.id){
+                        list['table'][j] = list['table'][j+1];
+                        document.getElementById(j).setAttribute('id',j-1);
+                    }
+                }
+                list['table'].length -=1;
+                writeDeleteSingleData();
+            }
+            
+            
+            console.log("passdata",passData);
+            //Create finish bar //////////////////////////////////////////////////////////////////////////////////////
+            console.log(this.id);
+            thisBtn.parentNode.remove();
+            datacount--;
+            MoveToFinishedList(passData);
+            showNolist();
+        }
+        li.setAttribute('class','list-group-item');
+        li.setAttribute('id','li'+datacount);
+        dueDate_p.appendChild(dueDate);
+        title_h5.appendChild(title);
+        li.appendChild(title_h5);
+        li.appendChild(des);
+        li.appendChild(btn_li);
+        li.appendChild(dueDate_p);
+        ul.appendChild(li);
+        showNolist();
+        datacount++;
+    });
+    document.getElementById('add').onclick = (event) =>{
+        ipcRenderer.send('call:addpage',list);
+    }
+
+</script>
+
+<style>
+    
+    .tt{
+        font-size: 25px;
+        margin: 0 20px 0;
+    }
+
+    .right{
+        float: right;
+    }
+    small{
+        text-align: center;
+        margin-top: 50px;
+        font-size: larger;
+    }
+    ul{
+        margin-top: 50px;
+    }
+
+
+
+    .containerBtn {
+    align-items: right ;
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    /* background-color: #FFF; */
+    padding:  10px 0px;
+    width: 100px;
+    }
+
+    .btnEff {
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 45px;
+    max-width: 160px;
+    position: relative;
+    text-decoration: none;
+    text-transform: uppercase;
+    width: 100%;
+    }
+    .btnEff:hover {
+    text-decoration: none;
+    }
+
+    /*btn_background*/
+    .effect04 {
+    --uismLinkDisplay: var(--smLinkDisplay, inline-flex);
+    display: var(--uismLinkDisplay);
+    color: #FFF;
+    outline: solid  1.5px #FFF;
+    position: relative;
+    transition-duration: 0.4s;
+    overflow: hidden;
+    }
+
+    .effect04::before,
+    .effect04 span{
+        margin: 0 auto;
+        transition-timing-function: cubic-bezier(0.86, 0, 0.07, 1);
+        transition-duration: 0.4s;
+    }
+
+    /* 文字1を上に */
+    .effect04:hover{
+
+    background-color: #FFF;
+    outline: solid  2px #000;
+    }
+
+    /* HOVERしたら文字1を上に */
+    .effect04:hover span{
+    -webkit-transform: translateY(-400%) scale(-0.1,20);
+            transform: translateY(-400%) scale(-0.1,20);
+    }
+
+    /*文字2*/
+    .effect04::before{
+    content: attr(data-sm-link-text);
+        color: #000;
+    position: absolute;
+    font-size: large;
+    left: 0;
+    right: 0;
+    margin: auto;
+    -webkit-transform: translateY(500%) scale(-0.1,20);
+            transform: translateY(500%) scale(-0.1,20);
+    }
+
+    /* HOVERしたら文字2を上に */
+    .effect04:hover::before{
+    letter-spacing: 0.05em;
+    -webkit-transform: translateY(0) scale(1,1);
+            transform: translateY(0) scale(1,1);
+    }
+
+    .colorT{
+        text-decoration-color: #FFF;
+        color: #FFF;
+    }
+
+    
+    strong {
+        position: relative;
+    }
+    strong::after {
+        content:"";
+        position: absolute;
+        bottom: -0.125rem;
+        left: -0.5rem;
+        right: -0.5rem;
+        height: 0.75rem;
+        z-index: -1;
+        background-image: url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/664131/underline.svg');
+        background-repeat: no-repeat;
+        background-size: cover;
+    }
+
+
+</style>
